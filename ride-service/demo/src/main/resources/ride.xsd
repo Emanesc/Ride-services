@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/ride/ws"
+           xmlns:tns="http://example.com/ride/ws"
+           elementFormDefault="qualified">
+
+    <!-- Créer un trajet -->
+    <xs:element name="CreateRideRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="departure" type="xs:string"/>
+                <xs:element name="destination" type="xs:string"/>
+                <xs:element name="departureTime" type="xs:dateTime"/>
+                <xs:element name="availableSeats" type="xs:int"/>
+                <xs:element name="price" type="xs:double"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="CreateRideResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="rideId" type="xs:long"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+ 
+    <!-- Vérifier disponibilité -->
+   
+    <xs:element name="CheckAvailabilityRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="rideId" type="xs:long"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="CheckAvailabilityResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="available" type="xs:boolean"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    
+    <!-- Lister tous les trajets -->
+ 
+    <xs:element name="GetAllRidesRequest">
+        <xs:complexType/>
+    </xs:element>
+
+    <xs:element name="GetAllRidesResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="rides" type="tns:RideInfo" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Type RideInfo utilisé pour la liste -->
+    <xs:complexType name="RideInfo">
+        <xs:sequence>
+            <xs:element name="id" type="xs:long"/>
+            <xs:element name="departure" type="xs:string"/>
+            <xs:element name="destination" type="xs:string"/>
+            <xs:element name="departureTime" type="xs:dateTime"/>
+            <xs:element name="availableSeats" type="xs:int"/>
+            <xs:element name="price" type="xs:double"/>
+        </xs:sequence>
+    </xs:complexType>
+
+</xs:schema>
