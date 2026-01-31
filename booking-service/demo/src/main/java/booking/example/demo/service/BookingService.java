@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -37,7 +39,7 @@ public class BookingService {
                 request.getRideId(), request.getPassengerId(), request.getNumberOfSeats());
 
         // Vérifier la disponibilité via ride-service
-        RideAvailabilityResponse availability = rideServiceClient.checkAvailability(request.getRideId());
+        RideAvailabilityResponse availability = checkAvailability(request.getRideId());
         
         if (availability == null || !availability.getAvailable()) {
             throw new IllegalArgumentException("Ride is not available");
@@ -68,6 +70,39 @@ public class BookingService {
                 savedBooking.getNumberOfSeats());
         
         return mapToResponse(savedBooking);
+    }
+
+    @Transactional
+    public BookingResponse processBookingFromId(Long bookingId) {
+        log.info("Processing booking from ID: {}", bookingId);
+        
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found with id: " + bookingId));
+        
+        if (booking.getStatus() == Booking.BookingStatus.CANCELLED) {
+            throw new IllegalArgumentException("Booking is cancelled");
+        }
+        
+        // Vérifier la disponibilité via ride-service
+        RideAvailabilityResponse availability = checkAvailability(booking.getRideId());
+        
+        if (availability == null || !availability.getAvailable()) {
+            throw new IllegalArgumentException("Ride is not available");
+        }
+
+        if (availability.getAvailableSeats() < booking.getNumberOfSeats()) {
+            throw new IllegalArgumentException(
+                    "Not enough available seats. Available: " + availability.getAvailableSeats() + 
+                    ", Requested: " + booking.getNumberOfSeats());
+        }
+        
+        // Publier un événement asynchrone pour mettre à jour les sièges disponibles
+        eventPublisher.publishBookingCreated(
+                booking.getId(), 
+                booking.getRideId(), 
+                booking.getNumberOfSeats());
+        
+        return mapToResponse(booking);
     }
 
     public Optional<BookingResponse> getBookingById(Long id) {
@@ -102,6 +137,58 @@ public class BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found with id: " + id));
     }
 
+    public List<BookingResponse> getBookingsByCity(String city) {
+        log.info("Searching bookings by city: {}", city);
+        
+        // 1. Get rides for this city
+        List<booking.example.demo.dto.RideResponse> rides = rideServiceClient.searchRides(city);
+        
+        if (rides.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        
+        List<Long> rideIds = rides.stream()
+                .map(booking.example.demo.dto.RideResponse::getId)
+                .collect(Collectors.toList());
+        
+        // 2. Find bookings for these ride IDs
+        return bookingRepository.findByRideIdIn(rideIds).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public RideAvailabilityResponse checkAvailability(Long rideId) {
+        // 1. Get Ride Details
+        booking.example.demo.dto.RideResponse ride = rideServiceClient.getRideById(rideId);
+        
+        if (ride == null) {
+            throw new IllegalArgumentException("Ride not found");
+        }
+        
+        // 2. Count sold seats
+        Integer soldSeats = bookingRepository.sumSeatsByRideIdAndStatus(rideId, Booking.BookingStatus.CONFIRMED);
+        if (soldSeats == null) soldSeats = 0;
+        
+        // 3. Calculate available seats locally
+        int localAvailable = ride.getAvailableSeats() - soldSeats;
+        
+        // Use the minimum between local calculation and ride-service data for safety
+        int finalAvailable = Math.min(localAvailable, ride.getAvailableSeats());
+        
+        log.debug("Ride {}: local calculation={}, ride-service={}, using={}", 
+                  rideId, localAvailable, ride.getAvailableSeats(), finalAvailable);
+        
+        // 4. Build response
+        RideAvailabilityResponse response = new RideAvailabilityResponse();
+        response.setRideId(rideId);
+        response.setAvailable(finalAvailable > 0);
+        response.setAvailableSeats(finalAvailable);
+        response.setMessage(finalAvailable > 0 ? "Available" : "Full");
+        response.setPrice(ride.getPrice());
+        
+        return response;
+    }
+
     private BookingResponse mapToResponse(Booking booking) {
         return BookingResponse.builder()
                 .id(booking.getId())
@@ -112,5 +199,64 @@ public class BookingService {
                 .bookingTime(booking.getBookingTime())
                 .build();
     }
-}
 
+    // ========================================
+    // NOUVELLES MÉTHODES POUR LE SYSTÈME D'ÉVALUATION
+    // ========================================
+
+    /**
+     * Récupérer tous les bookings (pour le dropdown)
+     */
+    public List<BookingResponse> getAllBookings() {
+        log.info("Fetching all bookings");
+        return bookingRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Récupérer les informations complètes pour l'évaluation
+     */
+    public Map<String, Object> getEvaluationInfo(Long bookingId) {
+        log.info("Fetching evaluation info for booking: {}", bookingId);
+        
+        // 1. Récupérer le booking
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found with id: " + bookingId));
+        
+        // 2. Récupérer les infos du ride via RideServiceClient
+        booking.example.demo.dto.RideResponse ride = rideServiceClient.getRideById(booking.getRideId());
+        
+        // 3. Construire la réponse
+        Map<String, Object> evaluationInfo = new HashMap<>();
+        evaluationInfo.put("bookingId", booking.getId());
+        evaluationInfo.put("rideId", booking.getRideId());
+        evaluationInfo.put("passengerId", booking.getPassengerId());
+        
+        // Infos du driver depuis le ride
+        if (ride != null) {
+            evaluationInfo.put("driverId", ride.getDriverId());
+            evaluationInfo.put("driverName", ride.getDriverName());
+        } else {
+            evaluationInfo.put("driverId", "UNKNOWN");
+            evaluationInfo.put("driverName", "Unknown Driver");
+        }
+        
+        log.info("Evaluation info prepared for booking {}", bookingId);
+        return evaluationInfo;
+    }
+
+    /**
+     * Supprimer définitivement un booking
+     */
+    @Transactional
+    public void deleteBooking(Long id) {
+        log.info("Deleting booking: {}", id);
+        
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Booking not found with id: " + id));
+        
+        bookingRepository.delete(booking);
+        log.info("Booking deleted successfully: {}", id);
+    }
+}

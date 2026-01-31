@@ -11,5 +11,7 @@ public class AvailabilityResponse {
     private Long rideId;
     private Boolean available;
     private Integer availableSeats;
+    private String message;
+    private Double price;
 }
 

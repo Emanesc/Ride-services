@@ -5,8 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import payment.example.demo.dto.PaymentRequest;
-import payment.example.demo.dto.PaymentResponse;
+import payment.example.demo.dto.*;
 import payment.example.demo.service.PaymentService;
 
 import java.util.List;
@@ -14,6 +13,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/payments")
+@CrossOrigin("*")
 public class PaymentController {
 
     private final PaymentService paymentService;
@@ -85,6 +85,39 @@ public class PaymentController {
             return ResponseEntity.ok(payments);
         } catch (Exception e) {
             log.error("Error fetching payments for passenger: {}", passengerId, e);
+            throw e;
+        }
+    }
+
+    // Nouveau endpoint pour créer un paiement avec seulement le booking ID
+    @PostMapping("/from-booking")
+    public ResponseEntity<PaymentResponse> createPaymentFromBooking(
+            @Valid @RequestBody PaymentByBookingRequest request) {
+        try {
+            log.info("Received payment request from booking ID: {}", request.getBookingId());
+            PaymentResponse response = paymentService.createPaymentFromBookingId(request);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid payment request: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Error creating payment from booking", e);
+            throw e;
+        }
+    }
+
+    // Endpoint pour obtenir le montant spécifique pour un passager
+    @GetMapping("/booking/{bookingId}/passenger-amount")
+    public ResponseEntity<PassengerAmountResponse> getPassengerAmount(@PathVariable Long bookingId) {
+        try {
+            log.info("Fetching passenger amount for booking: {}", bookingId);
+            PassengerAmountResponse response = paymentService.getPassengerAmount(bookingId);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid request: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Error fetching passenger amount for booking: {}", bookingId, e);
             throw e;
         }
     }

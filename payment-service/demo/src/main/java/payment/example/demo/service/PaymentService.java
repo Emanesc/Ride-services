@@ -3,8 +3,7 @@ package payment.example.demo.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import payment.example.demo.dto.PaymentRequest;
-import payment.example.demo.dto.PaymentResponse;
+import payment.example.demo.dto.*;
 import payment.example.demo.model.Payment;
 import payment.example.demo.repository.PaymentRepository;
 
@@ -18,9 +17,15 @@ import java.util.stream.Collectors;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final BookingServiceClient bookingServiceClient;
+    private final RideServiceClient rideServiceClient;
 
-    public PaymentService(PaymentRepository paymentRepository) {
+    public PaymentService(PaymentRepository paymentRepository,
+                         BookingServiceClient bookingServiceClient,
+                         RideServiceClient rideServiceClient) {
         this.paymentRepository = paymentRepository;
+        this.bookingServiceClient = bookingServiceClient;
+        this.rideServiceClient = rideServiceClient;
     }
 
     @Transactional
@@ -102,6 +107,89 @@ public class PaymentService {
         return paymentRepository.findByPassengerId(passengerId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    // Nouvelle méthode pour créer un paiement à partir d'un booking ID seulement
+    @Transactional
+    public PaymentResponse createPaymentFromBookingId(PaymentByBookingRequest request) {
+        log.info("Creating payment from booking ID: {}", request.getBookingId());
+
+        // Récupérer les informations du booking
+        BookingInfo bookingInfo = bookingServiceClient.getBookingById(request.getBookingId());
+        if (bookingInfo == null) {
+            throw new IllegalArgumentException("Booking not found with id: " + request.getBookingId());
+        }
+
+        // Récupérer les informations du ride
+        RideInfo rideInfo = rideServiceClient.getRideById(bookingInfo.getRideId());
+        if (rideInfo == null) {
+            throw new IllegalArgumentException("Ride not found with id: " + bookingInfo.getRideId());
+        }
+
+        // Compter le nombre total de passagers (toutes les réservations confirmées pour ce ride)
+        // Pour simplifier, on utilise le nombre de sièges réservés dans cette réservation
+        // Dans un vrai système, on compterait toutes les réservations confirmées
+        Integer totalPassengers = bookingInfo.getNumberOfSeats();
+
+        // Calculer le montant partagé
+        Double sharedAmount = calculateSharedAmount(rideInfo.getPrice(), totalPassengers);
+
+        log.info("Total ride price: {}, Number of passengers: {}, Shared amount per passenger: {}",
+                rideInfo.getPrice(), totalPassengers, sharedAmount);
+
+        Payment payment = new Payment();
+        payment.setBookingId(request.getBookingId());
+        payment.setRideId(bookingInfo.getRideId());
+        payment.setPassengerId(bookingInfo.getPassengerId());
+        payment.setDriverId(request.getDriverId());
+        payment.setTotalAmount(rideInfo.getPrice());
+        payment.setSharedAmount(sharedAmount);
+        payment.setNumberOfPassengers(totalPassengers);
+        payment.setStatus(Payment.PaymentStatus.PENDING);
+        payment.setPaymentTime(LocalDateTime.now());
+
+        Payment savedPayment = paymentRepository.save(payment);
+
+        log.info("Payment created successfully with id: {}", savedPayment.getId());
+
+        // Traiter le paiement
+        processPayment(savedPayment);
+
+        return mapToResponse(savedPayment);
+    }
+
+    // Méthode pour obtenir le montant spécifique pour un passager à partir de l'ID de booking
+    public PassengerAmountResponse getPassengerAmount(Long bookingId) {
+        log.info("Calculating passenger amount for booking: {}", bookingId);
+
+        // Récupérer les informations du booking
+        BookingInfo bookingInfo = bookingServiceClient.getBookingById(bookingId);
+        if (bookingInfo == null) {
+            throw new IllegalArgumentException("Booking not found with id: " + bookingId);
+        }
+
+        // Récupérer les informations du ride
+        RideInfo rideInfo = rideServiceClient.getRideById(bookingInfo.getRideId());
+        if (rideInfo == null) {
+            throw new IllegalArgumentException("Ride not found with id: " + bookingInfo.getRideId());
+        }
+
+        // Compter le nombre total de passagers (toutes les réservations confirmées)
+        // Pour simplifier, on utilise le nombre de sièges de cette réservation
+        Integer totalPassengers = bookingInfo.getNumberOfSeats();
+        Double amountPerPassenger = calculateSharedAmount(rideInfo.getPrice(), totalPassengers);
+        Double totalAmountForThisPassenger = amountPerPassenger * bookingInfo.getNumberOfSeats();
+
+        return PassengerAmountResponse.builder()
+                .bookingId(bookingId)
+                .rideId(bookingInfo.getRideId())
+                .passengerId(bookingInfo.getPassengerId())
+                .numberOfSeats(bookingInfo.getNumberOfSeats())
+                .totalRidePrice(rideInfo.getPrice())
+                .totalPassengers(totalPassengers)
+                .amountPerPassenger(amountPerPassenger)
+                .totalAmountForThisPassenger(totalAmountForThisPassenger)
+                .build();
     }
 
     private PaymentResponse mapToResponse(Payment payment) {

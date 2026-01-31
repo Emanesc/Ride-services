@@ -1,47 +1,51 @@
 package booking.example.demo.service;
 
-import booking.example.demo.dto.RideAvailabilityResponse;
+// import booking.example.demo.dto.RideAvailabilityResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
 
 @Slf4j
 @Service
 public class RideServiceClient {
 
     private final RestTemplate restTemplate;
-    
-    @Value("${ride.service.url:http://localhost:8081}")
-    private String rideServiceUrl;
+    private static final String RIDE_SERVICE_NAME = "ride-service";
 
     public RideServiceClient(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
-    public RideAvailabilityResponse checkAvailability(Long rideId) {
+    public booking.example.demo.dto.RideResponse getRideById(Long rideId) {
         try {
-            log.info("Checking availability for ride {} at {}", rideId, rideServiceUrl);
-            String url = rideServiceUrl + "/api/rides/" + rideId + "/availability";
-            ResponseEntity<RideAvailabilityResponse> response = restTemplate.getForEntity(
-                    url, RideAvailabilityResponse.class);
-            log.info("Availability response for ride {}: {}", rideId, response.getBody());
+            String url = "http://" + RIDE_SERVICE_NAME + "/api/rides/" + rideId;
+            log.info("Fetching ride details for {} at {}", rideId, url);
+            ResponseEntity<booking.example.demo.dto.RideResponse> response = restTemplate.getForEntity(
+                    url, booking.example.demo.dto.RideResponse.class);
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error checking availability for ride {}: {}", rideId, e.getMessage());
-            throw new RuntimeException("Failed to check ride availability: " + e.getMessage(), e);
+            log.error("Error fetching ride {}: {}", rideId, e.getMessage());
+            throw new RuntimeException("Failed to fetch ride details: " + e.getMessage(), e);
         }
     }
 
-    public void updateRideSeats(Long rideId, int seatsToReserve) {
+    public List<booking.example.demo.dto.RideResponse> searchRides(String city) {
         try {
-            log.info("Updating seats for ride {}: reserving {} seats", rideId, seatsToReserve);
-            // This would need a dedicated endpoint in ride-service
-            // For now, we'll handle it through the booking service logic
+            String url = "http://" + RIDE_SERVICE_NAME + "/api/rides/search?destination=" + city;
+            log.info("Searching rides in {} at {}", city, url);
+            // Note: Simplification - searching by destination as 'place'. Could be departure too.
+            // Using parameterized type reference or array for list
+            ResponseEntity<booking.example.demo.dto.RideResponse[]> response = restTemplate.getForEntity(
+                    url, booking.example.demo.dto.RideResponse[].class);
+            
+            if (response.getBody() == null) return java.util.Collections.emptyList();
+            return java.util.Arrays.asList(response.getBody());
         } catch (Exception e) {
-            log.error("Error updating seats for ride {}: {}", rideId, e.getMessage());
-            throw new RuntimeException("Failed to update ride seats: " + e.getMessage(), e);
+            log.error("Error searching rides for city {}: {}", city, e.getMessage());
+            return java.util.Collections.emptyList();
         }
     }
 }

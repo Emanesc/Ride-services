@@ -25,5 +25,12 @@ public class RideRequest {
     @NotNull(message = "Price is required")
     @Positive(message = "Price must be positive")
     private Double price;
+    
+    // ✅ NOUVEAUX CHAMPS - Pour les drivers
+    @NotBlank(message = "Driver ID is required")
+    private String driverId;
+    
+    private String driverName;  // Optionnel, peut être rempli automatiquement
+    
+    private String eventId;  // Optionnel
 }
-

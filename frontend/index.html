@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ride Services Premium</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">Ride<span>Services</span></div>
+            <nav>
+                <button class="nav-btn active" onclick="showSection('rides')">Find a Ride</button>
+                <button class="nav-btn" onclick="showSection('post-ride')">Post a Ride</button>
+                <button class="nav-btn" onclick="showSection('my-bookings')">My Bookings</button>
+                <button class="nav-btn" onclick="showSection('evaluations')">Evaluations</button>
+            </nav>
+        </header>
+
+        <!-- SECTION: FIND RIDES -->
+        <main id="rides-section" class="active-section">
+            <div class="hero">
+                <h1>Travel with Comfort</h1>
+                <p>Find the perfect ride for your journey.</p>
+
+                <div class="search-bar">
+                    <div class="input-group">
+                        <label>From</label>
+                        <input type="text" id="search-departure" placeholder="City...">
+                    </div>
+                    <div class="input-group">
+                        <label>To</label>
+                        <input type="text" id="search-destination" placeholder="City...">
+                    </div>
+                    <button class="search-btn" onclick="searchRides()">Search Rides</button>
+                </div>
+            </div>
+
+            <div id="rides-list" class="rides-grid">
+                <div class="loading-state">Loading available rides...</div>
+            </div>
+        </main>
+
+        <!-- SECTION: POST A RIDE -->
+        <main id="post-ride-section" class="hidden-section">
+            <h2>Post a New Ride</h2>
+            <div class="form-container"
+                style="max-width: 500px; margin: 0 auto; background: var(--bg-card); padding: 2rem; border-radius: 16px; border: 1px solid var(--border);">
+                
+                <!-- Driver Selection -->
+                <div class="form-group">
+                    <label>Select Driver *</label>
+                    <select id="post-driver" class="full-width" style="padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem;">
+                        <option value="">Loading drivers...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Departure City *</label>
+                    <input type="text" id="post-departure" class="full-width" placeholder="e.g. NKTT">
+                </div>
+                <div class="form-group">
+                    <label>Destination City *</label>
+                    <input type="text" id="post-destination" class="full-width" placeholder="e.g. NDB">
+                </div>
+                <div class="form-group">
+                    <label>Departure Time *</label>
+                    <input type="datetime-local" id="post-time" class="full-width">
+                </div>
+                <div class="row">
+                    <div class="form-group full-width">
+                        <label>Seats *</label>
+                        <input type="number" id="post-seats" class="full-width" min="1" max="6" value="3">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Price (MRU) *</label>
+                        <input type="number" id="post-price" class="full-width" min="1" value="25">
+                    </div>
+                </div>
+                <button class="primary-btn full-width" onclick="postRide()">Create Ride</button>
+            </div>
+        </main>
+
+        <!-- SECTION: MY BOOKINGS -->
+        <main id="my-bookings-section" class="hidden-section">
+            <h2>Your Bookings</h2>
+            <div class="input-group" style="max-width: 300px; margin-bottom: 2rem;">
+                <label>Search by City</label>
+                <div class="row">
+                    <input type="text" id="my-bookings-city" placeholder="e.g. Paris">
+                    <button class="action-btn" onclick="loadMyBookings()">Search</button>
+                </div>
+            </div>
+            <div id="bookings-list" class="bookings-grid">
+                <!-- Bookings will be injected here -->
+            </div>
+        </main>
+
+        <!-- SECTION EVALUATIONS -->
+        <main id="evaluations-section" class="hidden-section">
+            <h2>Evaluations & Ratings</h2>
+            
+            <!-- Submit Evaluation Form -->
+            <div class="form-container"
+                style="max-width: 700px; margin: 0 auto 2rem; background: var(--bg-card); padding: 2rem; border-radius: 16px; border: 1px solid var(--border);">
+                <h3 style="margin-top: 0;">Submit an Evaluation</h3>
+                
+                <div class="row">
+                    <div class="form-group full-width">
+                        <label>Booking ID *</label>
+                        <select id="eval-booking-id" class="full-width" style="padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem;" onchange="loadBookingDetails()">
+                            <option value="">Select a booking...</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Ride ID</label>
+                        <input type="text" id="eval-ride-id" class="full-width" placeholder="Auto-filled" readonly style="background: #1a1d2e;">
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="form-group full-width">
+                        <label>Evaluator *</label>
+                        <input type="text" id="eval-evaluator-id" class="full-width" placeholder="Auto-filled" readonly style="background: #1a1d2e;">
+                        <input type="hidden" id="eval-evaluator-id-real">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Evaluated User *</label>
+                        <input type="text" id="eval-evaluated-id" class="full-width" placeholder="Auto-filled" readonly style="background: #1a1d2e;">
+                        <input type="hidden" id="eval-evaluated-id-real">
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="form-group full-width">
+                        <label>Rating (1-5 stars) *</label>
+                        <select id="eval-rating" class="full-width" style="padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem;">
+                            <option value="5">Excellent (5)</option>
+                            <option value="4">Very Good (4)</option>
+                            <option value="3">Good (3)</option>
+                            <option value="2">Fair (2)</option>
+                            <option value="1">Poor (1)</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Evaluation Type *</label>
+                        <select id="eval-type" class="full-width" style="padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem;" onchange="updateEvaluationFields()">
+                            <option value="DRIVER">Driver</option>
+                            <option value="PASSENGER">Passenger</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Comment (Optional)</label>
+                    <textarea id="eval-comment" class="full-width" rows="4" placeholder="Share your experience..." style="padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; resize: vertical;"></textarea>
+                </div>
+                
+                <button class="primary-btn full-width" onclick="submitEvaluation()">Submit Evaluation</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+    <div id="booking-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal('booking-modal')">&times;</span>
+            <h2>Book Ride</h2>
+            <div id="booking-ride-details" class="modal-details"></div>
+
+            <div class="form-group">
+                <label>Passenger</label>
+                <input type="text" id="booking-passenger-id" placeholder="username">
+            </div>
+            <div class="form-group">
+                <label>Number of Seats</label>
+                <input type="number" id="booking-seats" value="1" min="1" max="4" onchange="updateTotal()">
+            </div>
+
+            <div class="price-summary"
+                style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px;">
+                <div class="row" style="justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span>Price per seat:</span>
+                    <span id="price-per-seat">0 MRU</span>
+                </div>
+                <div class="row"
+                    style="justify-content: space-between; font-weight: 700; font-size: 1.1rem; color: var(--primary);">
+                    <span>Total:</span>
+                    <span id="total-price">0 MRU</span>
+                </div>
+            </div>
+
+            <div id="availability-status" class="status-msg"></div>
+
+            <button class="primary-btn full-width" onclick="confirmBooking()">Confirm Booking</button>
+        </div>
+    </div>
+
+    <div id="payment-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal('payment-modal')">&times;</span>
+            <h2>Process Payment</h2>
+            <div id="payment-booking-details" class="modal-details"></div>
+
+            <button class="primary-btn full-width" onclick="processPayment()">Pay Now</button>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

@@ -15,6 +15,10 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/evaluations")
+@CrossOrigin(origins = "*", allowedHeaders = "*", 
+    methods = {RequestMethod.GET, RequestMethod.POST, 
+               RequestMethod.PUT, RequestMethod.DELETE, 
+               RequestMethod.OPTIONS})  // ← AJOUTÉ ICI
 public class EvaluationController {
 
     private final EvaluationService evaluationService;
@@ -90,4 +94,3 @@ public class EvaluationController {
         }
     }
 }
-
